@@ -18,6 +18,7 @@ release-artifacts/
 # frontend code
 node_modules/
 dist/
+.next/
 
 # e2e tests
 test-results/

@@ -1,47 +1,19 @@
 {
-    "name": "taggr",
-    "version": "0.1.0",
-    "description": "Decentralized Social Network",
-    "keywords": [
-        "TypeScript",
-        "Canister"
-    ],
+    "name": "gyotaku",
+    "version": "0.2.0",
+    "private": true,
     "scripts": {
-        "build": "webpack",
-        "postbuild": "find dist/frontend -name '*.js' -exec gzip -9n {} +",
-        "start": "webpack serve --mode development --env development",
+        "dev": "next dev",
+        "build": "next build && next export -o dist/frontend",
+        "start": "next start",
+        "lint": "next lint",
+        "juno:dev": "juno hosting dev --mode staging",
+        "juno:deploy": "juno hosting deploy",
         "test:e2e": "playwright test",
         "install:e2e": "playwright install chromium --with-deps",
         "format": "prettier --write .",
         "format:check": "prettier --check ."
     },
-    "devDependencies": {
-        "@playwright/test": "1.56.1",
-        "@types/isomorphic-fetch": "0.0.39",
-        "@types/react-dom": "19.0.0",
-        "buffer": "6.0.3",
-        "copy-webpack-plugin": "11.0.0",
-        "html-webpack-plugin": "5.5.3",
-        "isomorphic-fetch": "3.0.0",
-        "prettier": "^3.3.3",
-        "process": "0.11.10",
-        "raw-loader": "4.0.2",
-        "react": "19.0.0",
-        "react-dom": "19.0.0",
-        "react-markdown": "10.1.0",
-        "terser-webpack-plugin": "^5.3.10",
-        "ts-loader": "9.5.0",
-        "typescript": "5.8.3",
-        "webpack": "^5.102.1",
-        "webpack-cli": "5.1.4",
-        "webpack-dev-server": "^5.1.0"
-    },
-    "browserslist": [
-        "last 2 chrome version",
-        "last 2 firefox version",
-        "last 2 safari version",
-        "last 2 edge version"
-    ],
     "dependencies": {
         "@dfinity/agent": "2.4.1",
         "@dfinity/auth-client": "2.4.1",
@@ -50,6 +22,21 @@
         "@dfinity/ledger-icrc": "2.8.0",
         "@dfinity/principal": "2.4.1",
         "diff-match-patch": "1.0.5",
+        "next": "15.0.3",
+        "react": "19.0.0",
+        "react-dom": "19.0.0",
         "remark-gfm": "4.0.1"
+    },
+    "devDependencies": {
+        "@junobuild/cli": "1.5.0",
+        "@junobuild/config": "1.5.0",
+        "@playwright/test": "1.56.1",
+        "@types/node": "^22.7.5",
+        "@types/react": "^19.0.1",
+        "@types/react-dom": "^19.0.1",
+        "eslint": "^9.13.0",
+        "eslint-config-next": "15.0.3",
+        "prettier": "^3.3.3",
+        "typescript": "5.8.3"
     }
 }
