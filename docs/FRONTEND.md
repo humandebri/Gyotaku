@@ -5,14 +5,9 @@
 ## 使い方
 
 ```bash
-cd apps/gyotaku-portal
 npm install
-
-# 開発サーバー
-npm run dev
-
-# 本番ビルド（out/ を生成）
-npm run build
+npm run dev    # 開発サーバー
+npm run build  # dist/frontend へエクスポート
 ```
 
 ## Juno連携
@@ -21,3 +16,10 @@ npm run build
 - `npm run juno:deploy` — `juno hosting deploy` を実行。`juno.config.ts` 内の `ids` / `source` を参照します。
 
 `JUNO_TOKEN` を環境変数に設定した上でコマンドを実行してください（例: `.env` やシェルのexport）。
+
+## ルーティング（暫定）
+- `/` : ホーム（フィードのモック）
+- `/capture` : 魚拓作成フォーム
+- `/archive` : 魚拓一覧
+- `/archive/[id]` : 魚拓詳細
+- `/governance` / `/profile` / `/settings` : 旧UI機能の移植先プレースホルダ

@@ -6,15 +6,17 @@ use crate::{
 };
 use base64::{engine::general_purpose, Engine as _};
 use ic_certified_map::{labeled, labeled_hash, AsHashTree, Hash, RbTree};
+use include_dir::{include_dir, Dir};
 use serde_bytes::ByteBuf;
 use sha2::{Digest, Sha256};
-use std::collections::HashMap;
+use std::{collections::HashMap, path::Path};
 
 pub type Headers = Vec<(String, String)>;
 
 const LABEL: &[u8] = b"http_assets";
 static mut ASSET_HASHES: Option<RbTree<Vec<u8>, Hash>> = None;
 static mut ASSETS: Option<HashMap<String, (Headers, Vec<u8>)>> = None;
+static FRONTEND_DIR: Dir<'_> = include_dir!("../../dist/frontend");
 
 fn asset_hashes<'a>() -> &'a mut RbTree<Vec<u8>, Hash> {
     #[allow(static_mut_refs)]
@@ -30,7 +32,6 @@ fn assets<'a>() -> &'a mut HashMap<String, (Headers, Vec<u8>)> {
     }
 }
 
-pub static INDEX_HTML: &[u8] = include_bytes!("../../dist/frontend/index.html");
 pub fn index_html_headers() -> Headers {
     vec![("Content-Type".into(), "text/html; charset=UTF-8".into())]
 }
@@ -46,99 +47,7 @@ pub fn load(domains: &HashMap<String, DomainConfig>) {
         .find(|(_, cfg)| cfg.owner.is_none())
         .map(|(domain, _)| domain)
         .expect("no DAO domains");
-
-    add_asset(
-        &["/", "/index.html"],
-        index_html_headers(),
-        set_index_metadata(dao_owned_domain, INDEX_HTML),
-    );
-
-    add_asset(
-        &["/index.js"],
-        vec![
-            ("Content-Type".into(), "text/javascript".into()),
-            ("Content-Encoding".into(), "gzip".into()),
-        ],
-        include_bytes!("../../dist/frontend/index.js.gz").to_vec(),
-    );
-
-    add_asset(
-        &["/dfinity.js"],
-        vec![
-            ("Content-Type".into(), "text/javascript".into()),
-            ("Content-Encoding".into(), "gzip".into()),
-        ],
-        include_bytes!("../../dist/frontend/dfinity.js.gz").to_vec(),
-    );
-
-    add_asset(
-        &["/react.js"],
-        vec![
-            ("Content-Type".into(), "text/javascript".into()),
-            ("Content-Encoding".into(), "gzip".into()),
-        ],
-        include_bytes!("../../dist/frontend/react.js.gz").to_vec(),
-    );
-
-    add_asset(
-        &["/vendors.js"],
-        vec![
-            ("Content-Type".into(), "text/javascript".into()),
-            ("Content-Encoding".into(), "gzip".into()),
-        ],
-        include_bytes!("../../dist/frontend/vendors.js.gz").to_vec(),
-    );
-
-    add_asset(
-        &["/app-components.js"],
-        vec![
-            ("Content-Type".into(), "text/javascript".into()),
-            ("Content-Encoding".into(), "gzip".into()),
-        ],
-        include_bytes!("../../dist/frontend/app-components.js.gz").to_vec(),
-    );
-
-    add_asset(
-        &["/favicon.ico"],
-        vec![("Content-Type".into(), "image/vnd.microsoft.icon".into())],
-        include_bytes!("../../src/frontend/assets/favicon.ico").to_vec(),
-    );
-
-    add_asset(
-        &["/_/raw/apple-touch-icon.png"],
-        vec![("Content-Type".into(), "image/png".into())],
-        include_bytes!("../../src/frontend/assets/apple-touch-icon.png").to_vec(),
-    );
-
-    add_asset(
-        &["/_/raw/social-image.jpg"],
-        vec![("Content-Type".into(), "image/jpeg".into())],
-        include_bytes!("../../src/frontend/assets/social-image.jpg").to_vec(),
-    );
-
-    add_asset(
-        &["/font-regular.woff2"],
-        vec![("Content-Type".into(), "application/font-woff2".into())],
-        include_bytes!("../../src/frontend/assets/font-regular.woff2").to_vec(),
-    );
-
-    add_asset(
-        &["/font-bold.woff2"],
-        vec![("Content-Type".into(), "application/font-woff2".into())],
-        include_bytes!("../../src/frontend/assets/font-bold.woff2").to_vec(),
-    );
-
-    add_asset(
-        &["/WHITEPAPER.md"],
-        vec![("Content-Type".into(), "text/markdown".into())],
-        include_bytes!("../../src/frontend/assets/WHITEPAPER.md").to_vec(),
-    );
-
-    add_asset(
-        &["/manifest.json"],
-        vec![("Content-Type".into(), "application/json".into())],
-        include_bytes!("../../src/frontend/assets/manifest.json").to_vec(),
-    );
+    add_static_frontend(dao_owned_domain);
 
     add_asset(
         &["/.well-known/ii-alternative-origins"],
@@ -197,6 +106,49 @@ fn add_asset(paths: &[&str], headers: Headers, bytes: Vec<u8>) {
         add_value_to_certify(path, hash);
         assets().insert(path.to_string(), (headers.clone(), bytes.clone()));
     }
+}
+
+fn add_static_frontend(dao_domain: &str) {
+    for file in FRONTEND_DIR.files() {
+        let rel_path = file.path().to_string_lossy().replace('\\', "/");
+        let bytes = file.contents().to_vec();
+        if rel_path == "index.html" {
+            add_asset(
+                &["/", "/index.html"],
+                index_html_headers(),
+                set_index_metadata(dao_domain, &bytes),
+            );
+            continue;
+        }
+        let route = format!("/{}", rel_path);
+        let headers = headers_for(&rel_path);
+        add_asset(&[route.as_str()], headers, bytes);
+    }
+}
+
+fn headers_for(path: &str) -> Headers {
+    let mime = Path::new(path)
+        .extension()
+        .and_then(|ext| ext.to_str())
+        .map(|ext| ext.to_ascii_lowercase())
+        .map(|ext| match ext.as_str() {
+            "html" => "text/html; charset=UTF-8",
+            "css" => "text/css",
+            "js" => "application/javascript",
+            "json" => "application/json",
+            "svg" => "image/svg+xml",
+            "png" => "image/png",
+            "jpg" | "jpeg" => "image/jpeg",
+            "webp" => "image/webp",
+            "ico" => "image/vnd.microsoft.icon",
+            "woff2" => "application/font-woff2",
+            "md" => "text/markdown; charset=UTF-8",
+            "txt" => "text/plain; charset=UTF-8",
+            _ => "application/octet-stream",
+        })
+        .unwrap_or("application/octet-stream");
+
+    vec![("Content-Type".into(), mime.into())]
 }
 
 pub fn asset_certified(path: &str) -> Option<(Headers, ByteBuf)> {

@@ -41,21 +41,20 @@ note: "Taggr本体を温存したまま魚拓機能へスライドさせるた�
 - `src/backend/queries.rs`
   - `files` テーブルを直接 expose する `get_post_files(post_id)` を追加しておけば、フロントは bucket URL をクラスタ内で計算できる。現行の query パターン（`reply(read(|state| { ... }))`）に倣う。
 
-### フロントエンド
-- `src/frontend/src/form.tsx`
-  - Gyotakuモードのフォーム（URL入力、スクショアップロード、メタ情報表示）を `Form` の props と state で切り替え。`tmpBlobs` に `archive_*` ID をセットし、本文には簡易サマリのみを残す。
-- `src/frontend/src/new.tsx`
-  - `PostSubmissionForm` に「魚拓作成」タブを追加。`newPostCallback` へ `mode: "gyotaku" | "default"` を渡し、Gyotaku時は realm を強制・`encodeExtension` を空にする。
-- `src/frontend/src/post.tsx`
-  - `filesToUrls` の返り値を画像以外も扱える形へ拡張（`bucketBlobUrl` を呼ぶ）。`PostView` で `archive_meta` を検出した際に JSON fetch → 元URLや検証情報を描画するカードを追加。
-- `src/frontend/src/post_feed.tsx` / `src/frontend/src/search.tsx`
-  - `realm === "gyotaku"` の投稿だけを集計するフィルタと新しいタブ（例: “Gyotaku”）を追加。既存の feed ロジック（`loadFeed`）を流用しつつ、UIだけ切り替え。
-- `src/frontend/src/api.ts`
-  - 新たに追加する backend update/query を interface に追加し、`window.api` で呼べるようにする。`Backend` 型破壊を避けるため optional メソッドとして定義しておく。
+### フロントエンド（Next.js）
+- ルーティング
+  - `app/(site)/layout.tsx` で共通ナビゲーションを提供。`/`（ホーム）、`/capture`, `/archive`, `/archive/[id]`, `/governance`, `/profile`, `/settings` を段階的に実装。
+- `app/(site)/capture/page.tsx`
+  - Gyotakuモードのフォーム（URL入力、スクショアップロード、メタ情報表示）をここで実装し、Route Handler に `archive_*` blob を送る。
+- `app/(site)/archive/[id]/page.tsx`
+  - `archive_meta` を検出した際に JSON fetch → 元URLや検証情報を描画するカードを追加。`/_next/static` からスクリーンショットを取得する仕組みを `headers_for` と一致させる。
+- `app/(site)/archive/page.tsx` / `app/(site)/search/page.tsx`
+  - `realm === "gyotaku"` の投稿だけを集計するフィルタと新しいタブを用意し、Next.js のデータフェッチ機構へ統合。
+- `app/lib/ic-client.ts`（新設）
+  - DFINITY SDK 呼び出しや `verify_archive` ラッパーを集約し、route handler・server actions から再利用する。
 
 ### Bucket UI/UX
-- `bucketImageUrl` を `bucketBlobUrl` にリネームし、`Content-Type` を query で渡す（デフォルトは従来通り image/png）。既存の画像フローは互換を保つ。
-- Blobのダウンロード導線を `src/frontend/src/post.tsx` に追加し、ユーザーが HTML / JSON を直接保存できるようにする。
+- Next.js 側は `/_next/static/...` を参照するため、`bucketBlobUrl` 相当の導線を Next Route Handler で提供し、Blobダウンロードも `app/archive/[id]/page.tsx` から行う。
 
 ## 次アクション
 1. 既存機能を保持したままGyotaku要件を満たせるか、各カテゴリのリスクを洗い直す（テスト観点・UX観点）。

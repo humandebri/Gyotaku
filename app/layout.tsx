@@ -1,5 +1,3 @@
-"use client";
-
 import type { Metadata } from "next";
 import "./globals.css";
 
@@ -29,6 +27,9 @@ export default function RootLayout({
 }: Readonly<{ children: React.ReactNode }>) {
     return (
         <html lang="ja">
+            <head>
+                <meta name="mark" content="OG" />
+            </head>
             <body>{children}</body>
         </html>
     );

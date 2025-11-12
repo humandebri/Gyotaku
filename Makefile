@@ -34,7 +34,7 @@ test:
 	npm run test:e2e
 
 fe:
-	npm run build --quiet
+	npm run build
 
 e2e_build:
 	NODE_ENV=production DFX_NETWORK=local npm run build
@@ -64,5 +64,4 @@ backup:
 	./backup.sh $(DIR)
 
 .PHONY: backup
-
 

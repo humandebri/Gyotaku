@@ -27,7 +27,7 @@ note: "docs/docs.txt から抽出した全情報をGyotaku開発の観点で整�
                production: "qsgjb-riaaa-aaaaa-aaaga-cai",
                staging: "xxxx-xxxx-xxxx-xxxx-cai",
            },
-           source: "dist",          // Next.jsなら"out"
+           source: "dist/frontend",
            predeploy: ["npm run build"],
            ignore: ["**/*.txt", ".tmp/"],
            precompress: [
@@ -47,7 +47,7 @@ note: "docs/docs.txt から抽出した全情報をGyotaku開発の観点で整�
    });
    ```
    - `satellite.id` または `satellite.ids` のいずれかを使用（両立不可）。  
-   - `source` はビルド成果物のディレクトリ（Next.js: `out`, React/Vite: `dist`, SvelteKit: `build`, Angular: `dist/<app>/browser`）。  
+  - `source` はビルド成果物のディレクトリ（本プロジェクトでは `dist/frontend`。一般的には Next.js: `out`, React/Vite: `dist`, SvelteKit: `build` など）。  
    - `predeploy` でビルドやLintを自動化。  
    - `ignore` は `.gitignore` と同様のglob指定。  
    - `precompress` は `pattern / mode / algorithm` を細かく調整できる（HTMLを `mode:"replace"` にするとSNSプレビューが壊れるので注意）。  
@@ -138,17 +138,15 @@ jobs:
 このノートを基にPoCを進め、追加で必要な CLI コマンド例やエラートラブルシューティングが出てきたら本ファイルへ追記する。
 
 ## 9. 現在のNext.js実装位置
-- ディレクトリ: `apps/gyotaku-portal/`
-  - `package.json` に Next.js + React 19 + Juno CLI の依存を定義。
+- ルート直下に Next.js アプリを配置（`app/`, `public/`, `next.config.mjs`, `juno.config.ts`）。
+  - `package.json` は Next.js + React 19 + DFINITY SDK + Playwright 依存を包含。
   - `app/page.tsx` で Xリンク検出モックを用意（プレビューをX風or汎用で切り替えるUI）。
-  - `juno.config.ts` は `source: "out"` を参照し、`npm run build`（= `next build && next export`）で生成する静的ファイルをSatelliteへ配信。
+  - `npm run build` は `next build && next export -o dist/frontend` を実行し、Canisterが `include_dir!` で読み込む静的ファイルを生成。
 - 主要コマンド
   - `npm run dev` — Next.js開発サーバー。
-  - `npm run build` — Juno用に `out/` を生成。
-  - `npm run juno:dev` / `juno:deploy` — CLIラッパー。`JUNO_TOKEN`、`ids.production`／`ids.staging` を環境に合わせて更新する。
-- プロジェクトルートからの操作例:
+  - `npm run build` — `dist/frontend` へエクスポート。
+  - `npm run juno:dev` / `npm run juno:deploy` — Juno CLIラッパー。`JUNO_TOKEN`、`ids.production`／`ids.staging` を環境に合わせて更新する。
   ```bash
-  cd apps/gyotaku-portal
   npm install
   npm run dev        # または npm run juno:dev
   ```

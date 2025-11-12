@@ -6,7 +6,7 @@ export default defineConfig({
             production: "xxxx-xxxx-xxxx-xxxx-cai",
             staging: "yyyy-yyyy-yyyy-yyyy-cai",
         },
-        source: "out",
+        source: "dist/frontend",
         predeploy: ["npm run build"],
         precompress: [
             {

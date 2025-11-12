@@ -182,20 +182,19 @@ TaggrのUI／文言が「ソーシャルネットワーク寄り」なので、�
 
 - バックエンド
   - `src/backend/updates.rs` の `add_post_data` → `add_post_blob` → `commit_post` が投稿保存の本線。`Post::create`／`Post::save_blobs`（`src/backend/env/post.rs`）に着地し、`Storage::write_to_bucket`（`src/backend/env/storage.rs`）経由で bucket canister へバイナリを書き込む。
-  - 投稿の添付は `Post.files: BTreeMap<String, (u64, usize)>` に `id@bucket_principal` で紐づき、フロント側 `filesToUrls`（`src/frontend/src/post.tsx`）が `bucketImageUrl`（`src/frontend/src/common.tsx`）へ変換している。現状は `/image` エンドポイント固定なので、HTML等の任意BLOBを返すには bucket 側に追加ルートが必要。
+  - 投稿の添付は `Post.files: BTreeMap<String, (u64, usize)>` に `id@bucket_principal` で紐づき、Next.js 側では `/_next/static/...` のURLを生成して描画する。現状は `/image` エンドポイント固定なので、HTML等の任意BLOBを返すには bucket 側に追加ルートが必要。
   - 投稿ドラフトは `src/backend/env/user.rs` の `Draft` 構造体で保持（本文・realm・extension・blobs）。Gyotaku情報はここにJSON化して格納するか、既存の `blobs` と `files` を流用して `meta.json`／`raw.html` を添付すればデータ構造を変えずに運べる。
   - Notary/ハッシュ計算向けの拡張は `Post.hashes`（削除時に使用）と `Post.extension` を流用できないため、`Post.files` に proof JSON を置き、検証ロジックは別queryで取り出す形が現実的。
 
 - フロントエンド
-  - 投稿フォームは `src/frontend/src/form.tsx` → `newPostCallback`（`src/frontend/src/new.tsx`）で API を呼ぶ。Gyotaku入力欄（URL・スクリーンショットなど）は `Form` に追加フィールドを増やし、`submitCallback` に `blobs` として渡すのが最小改修。
-  - 表示側は `PostView`（`src/frontend/src/post.tsx`）で `filesToUrls` の結果を `<img>` 表示している。Gyotakuでは `meta.json` をフェッチし、元URLや検証結果を右ペインに表示するための UI 拡張が必要。
-  - API レイヤーは `src/frontend/src/api.ts` の `Backend` インターフェイスで統制されている。アーカイブ専用の update/query を追加する場合はここに型を追記する。
+  - 投稿フォームは Next.js App Router 上で再実装し、URL・スクリーンショットなどを `Route Handler` へ投げる。Gyotaku入力欄は `app/(site)/capture/page.tsx` で管理する。
+  - 表示側は `app/archive/[id]/page.tsx` で `meta.json` を読み込み、元URLや検証結果をCard化する。Xリンクの場合はX風カードに切り替える。
+  - API レイヤーは Next.js の server actions / route handlers へ移行し、DFINITY SDK 呼び出しを `app/lib/ic-client.ts` などに閉じ込める。
 
 7. Gyotaku移行タスク（コード指定）
 
-### 7.1 フェーズ0：Gyotakuモードの導線整備（現Taggr温存）
-- `src/frontend/src/form.tsx` に「魚拓を作成」用のトグルと URL 入力欄を追加。`submitCallback` で `blobs` に `meta.json`（URL, timestamp, canonical hash, merkle root など）と `html`/`screenshot` を詰める。
-- `src/frontend/src/new.tsx` の `newPostCallback` で `optionalRealm` を Gyotaku専用 Realm に固定できるようパラメータを受け取る。Realm名は `src/backend/env/realms.rs`（`realms::create_realm` 周辺）で初期化しておく。
+- `app/(site)/capture/page.tsx` に「魚拓を作成」フォームと URL 入力欄を実装。`meta.json`（URL, timestamp, canonical hash, merkle root など）と `html`/`screenshot` をRoute Handlerへ送る。
+- Realm指定は Next 側でGyotaku専用Realmを強制し、`src/backend/env/realms.rs`（`realms::create_realm` 周辺）の初期化と整合をとる。
 - `src/backend/env/realms.rs` および `state.init()`（`src/backend/env/mod.rs`）に「gyotaku」Realm をプリセット登録。これにより既存の `Post.realm` を使って魚拓と通常投稿をUIで切り替えられる。
 
 ### 7.2 フェーズ1：アーカイブ保存API
@@ -204,13 +203,13 @@ TaggrのUI／文言が「ソーシャルネットワーク寄り」なので、�
 - バケット canister（`src/bucket/src/lib.rs`）に `/blob` のようなHTTPルートを追加し、`Content-Type` を `application/json` / `text/html` などアップロード時に決められるようクエリパラメータを拡張する。`bucketImageUrl` も一般化して `bucketBlobUrl` を用意。
 
 ### 7.3 フェーズ2：閲覧・検証UI
-- `src/frontend/src/post.tsx` で `files` 内に `archive_meta` があれば JSON を読み込み、元URL・取得日時・Merkle root などをサマリカードに表示。`meta.json` からスクショIDを辿って `<img>`／ダウンロードボタンを描画。
-- `src/frontend/src/post_feed.tsx`／`src/frontend/src/search.tsx` に `realm === "gyotaku"` フィルタを追加し、魚拓専用の一覧ページを提供。
-- API側で `get_archive_blob(post_id, blob_id)` のような query を `src/backend/queries.rs` に追加し、クライアントが bucket URL を直接組み立てなくても良いようにする（セキュリティ／CORS対策）。既存の `files` 取得パターンを流用すればOK。
+- `app/archive/[id]/page.tsx` で `archive_meta` を読み込み、元URL・取得日時・Merkle root をカード表示。`meta.json` からスクショIDを辿って `<Image>`／ダウンロードボタンを描画。
+- `app/archive/page.tsx`（一覧）や `app/search/page.tsx` で `realm === "gyotaku"` の投稿のみを表示する。
+  - API側で `get_archive_blob(post_id, blob_id)` のような query を `src/backend/queries.rs` に追加し、Nextクライアントが bucket URL を直接組み立てなくても良いようにする（セキュリティ／CORS対策）。既存の `files` 取得パターンを流用すればOK。
 
 ### 7.4 フェーズ3：Notary連携
 - `src/backend/env/mod.rs` もしくは専用モジュールに `GyotakuProof` ヘルパーを実装し、`meta.json` に入っている `merkle_root` を `State::notary`（新規フィールド）へ書き込む update を追加。データ構造は維持し、`Post.hashes` には触れない。
-- `src/frontend/src/post.tsx` に検証ボタンを配置し、`verify_archive(post_id)` query を叩いて Notaryとの照合結果（OK/NG/Unknown）を表示。結果は `popUp` またはカード内で示す。
+- `app/archive/[id]/page.tsx` に検証ボタンを配置し、`verify_archive(post_id)` query を叩いて Notaryとの照合結果（OK/NG/Unknown）を表示。結果はカード内のステータスとして反映。
 
 ### 7.5 フェーズ4：テストと監視
 - バックエンド: `cargo test -- --test-threads 1` で `Post::save_blobs` の新分岐や Realm 初期化の回帰を確認。必要に応じて `src/backend/env/post.rs` に単体テストを追加。
