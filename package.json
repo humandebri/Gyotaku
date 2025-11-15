@@ -4,7 +4,7 @@
     "private": true,
     "scripts": {
         "dev": "next dev",
-        "build": "next build && next export -o dist/frontend",
+        "build": "next build && rm -rf dist/frontend && mkdir -p dist && mv out dist/frontend",
         "start": "next start",
         "lint": "next lint",
         "juno:dev": "juno hosting dev --mode staging",
@@ -24,6 +24,7 @@
         "remark-gfm": "4.0.1"
     },
     "devDependencies": {
+        "@junobuild/nextjs-plugin": "latest",
         "@junobuild/cli": "latest",
         "@junobuild/config": "latest",
         "@playwright/test": "1.56.1",

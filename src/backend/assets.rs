@@ -16,7 +16,11 @@ pub type Headers = Vec<(String, String)>;
 const LABEL: &[u8] = b"http_assets";
 static mut ASSET_HASHES: Option<RbTree<Vec<u8>, Hash>> = None;
 static mut ASSETS: Option<HashMap<String, (Headers, Vec<u8>)>> = None;
-static FRONTEND_DIR: Dir<'_> = include_dir!("../../dist/frontend");
+pub static INDEX_HTML: &[u8] = include_bytes!(concat!(
+    env!("CARGO_MANIFEST_DIR"),
+    "/../../dist/frontend/index.html"
+));
+static FRONTEND_DIR: Dir<'_> = include_dir!("$CARGO_MANIFEST_DIR/../../dist/frontend");
 
 fn asset_hashes<'a>() -> &'a mut RbTree<Vec<u8>, Hash> {
     #[allow(static_mut_refs)]

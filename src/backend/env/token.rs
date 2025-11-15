@@ -135,7 +135,7 @@ fn icrc1_metadata() -> Vec<(String, Value)> {
             Value::Text(format!(
                 "data:image/png;base64,{}",
                 general_purpose::STANDARD
-                    .encode(include_bytes!("../../frontend/assets/apple-touch-icon.png"))
+                    .encode(include_bytes!("../../../public/apple-touch-icon.png"))
             )),
         ),
     ]

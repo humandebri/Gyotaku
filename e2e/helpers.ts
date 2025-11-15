@@ -74,7 +74,16 @@ export async function handleDialogSequence(
                 return;
             }
 
-            const { expectedPattern, response } = dialogs[dialogIndex];
+            const scenario = dialogs[dialogIndex];
+            if (!scenario) {
+                await dialog.dismiss();
+                rejectors[dialogIndex]?.(
+                    new Error(`Dialog ${dialogIndex}: No scenario defined`),
+                );
+                return;
+            }
+
+            const { expectedPattern, response } = scenario;
             const message = dialog.message();
             const matches =
                 typeof expectedPattern === "string"

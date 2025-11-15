@@ -162,7 +162,7 @@ mod string {
 
 pub const CONFIG: &Config = &Config {
     name: "Taggr",
-    logo: include_str!("../../frontend/assets/logo.min.svg"),
+    logo: include_str!("../../../public/logo.min.svg"),
     staging: "e4i5g-biaaa-aaaao-ai7ja-cai.icp0.io",
     staging2: "2ogwt-7aaaa-aaaam-aedoa-cai.icp0.io",
 

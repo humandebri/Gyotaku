@@ -96,13 +96,14 @@ export default function CapturePage() {
                                     : "Generic Preview"}
                             </p>
                             <h4 style={{ margin: "4px 0 8px" }}>{preview.title}</h4>
-                            <Link
+                            <a
                                 href={preview.url}
                                 target="_blank"
+                                rel="noreferrer"
                                 style={{ color: "#38bdf8" }}
                             >
                                 {preview.url}
-                            </Link>
+                            </a>
                         </div>
                     </div>
                 )}

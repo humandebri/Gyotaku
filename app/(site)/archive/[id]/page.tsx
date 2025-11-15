@@ -1,12 +1,32 @@
 import { notFound } from "next/navigation";
+import type { Metadata } from "next";
 import { mockArchives } from "../../data";
 
-export default function ArchiveDetail({
+type PageProps = {
+    params: Promise<{ id: string }>;
+};
+
+export async function generateMetadata({
     params,
-}: {
-    params: { id: string };
-}) {
-    const archive = mockArchives.find((a) => a.id === params.id);
+}: PageProps): Promise<Metadata> {
+    const { id } = await params;
+    const archive = mockArchives.find((a) => a.id === id);
+    if (!archive) {
+        return { title: "Archive not found" };
+    }
+    return {
+        title: `Archive ${archive.id}`,
+        description: `Captured ${archive.capturedAt} (${archive.domain})`,
+    };
+}
+
+export async function generateStaticParams() {
+    return mockArchives.map(({ id }) => ({ id }));
+}
+
+export default async function ArchiveDetail({ params }: PageProps) {
+    const { id } = await params;
+    const archive = mockArchives.find((a) => a.id === id);
     if (!archive) {
         notFound();
     }

@@ -1,7 +1,8 @@
 import Link from "next/link";
+import type { Route } from "next";
 import type { ReactNode } from "react";
 
-const navItems = [
+const navItems: { href: Route; label: string }[] = [
     { href: "/", label: "ホーム" },
     { href: "/capture", label: "魚拓作成" },
     { href: "/archive", label: "魚拓一覧" },
