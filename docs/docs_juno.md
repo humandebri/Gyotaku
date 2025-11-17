@@ -7416,9 +7416,7 @@ The emulator provides a complete local environment to build, test, and run your 
 📄
 Skylab
 The junobuild/skylab image is an all-in-one emulator for local development. It bundles everything you need to build, test, and explore the Juno ecosystem:
-📄
-Satellite
-Unlike Skylab, the image junobuild/satellite runs a single Satellite in a headless environment, without the Console UI. It always mounts the same Satellite, using the fixed ID jx5yt-yyaaa-aaaal-abzbq-cai.
+
 📄
 Infrastructure
 In the local environment, several services (which can be either canisters or apps on the Internet Computer) are automatically spun up. This ensures that developers have everything they need to start building right out of the box. Thanks to built-in plugins and tooling, these services are automatically integrated into the environment, eliminating the need for developers to manually manage their bindings.

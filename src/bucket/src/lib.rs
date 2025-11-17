@@ -66,6 +66,7 @@ fn http_request(req: HttpRequest) -> HttpResponse {
     let url = url::parse(&req.url);
     match url.path {
         "/image" => http_image(url.args),
+        "/asset" => http_asset(url.args),
         _ => HttpResponse {
             status_code: 404,
             ..Default::default()
@@ -108,6 +109,34 @@ fn http_image(args: &str) -> HttpResponse {
             upgrade: None,
         },
         Err(msg) => error(msg),
+    }
+}
+
+fn http_asset(args: &str) -> HttpResponse {
+    let offset = url::find_arg_value(args, "offset=").and_then(|v| v.parse::<u64>().ok());
+    let len = url::find_arg_value(args, "len=").and_then(|v| v.parse::<u64>().ok());
+    if offset.is_none() || len.is_none() {
+        return HttpResponse {
+            status_code: 400,
+            body: ByteBuf::from(b"Invalid or missing arguments".as_slice()),
+            ..Default::default()
+        };
+    }
+    match read_blob(offset.unwrap(), len.unwrap()) {
+        Ok(blob) => HttpResponse {
+            status_code: 200,
+            headers: vec![
+                ("Content-Type".into(), "text/html; charset=utf-8".into()),
+                ("Cache-Control".into(), "public, max-age=100000".into()),
+            ],
+            body: ByteBuf::from(blob),
+            upgrade: None,
+        },
+        Err(msg) => HttpResponse {
+            status_code: 400,
+            body: ByteBuf::from(msg.as_bytes()),
+            ..Default::default()
+        },
     }
 }
 

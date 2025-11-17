@@ -1,113 +1,94 @@
-"use client";
+import CaptureForm, { type CaptureFormState } from "./capture-form";
+import { submitCapture } from "@/lib/taggr-client";
 
-import Link from "next/link";
-import { useState } from "react";
+const MAX_HTML_BYTES = 4 * 1024 * 1024;
 
-type SourceSummary = {
-    url: string;
-    title: string;
-    platform: "x" | "generic";
+const initialState: CaptureFormState = {
+    status: "idle",
+    message: "",
 };
 
-export default function CapturePage() {
-    const [preview, setPreview] = useState<SourceSummary | null>(null);
+async function createCapture(
+    _prevState: CaptureFormState,
+    formData: FormData,
+): Promise<CaptureFormState> {
+    "use server";
 
-    const handleProbe = (formData: FormData) => {
-        const target = String(formData.get("url") || "").trim();
-        if (!target) return;
-        const isX = /(?:https?:\/\/)?(?:www\.)?(?:x\.com|twitter\.com)\//i.test(
-            target,
-        );
-        setPreview({
-            url: target,
-            platform: isX ? "x" : "generic",
-            title: isX ? "X mirror preview (予定)" : "汎用リンクプレビュー",
-        });
+    const url = (formData.get("url") ?? "").toString().trim();
+    const notes = (formData.get("notes") ?? "").toString().trim();
+    const realm = (formData.get("realm") ?? "").toString().trim();
+
+    if (!url) {
+        return {
+            status: "error",
+            message: "URLを入力してください。",
+        };
+    }
+
+    let html: string;
+    try {
+        const response = await fetch(url, { cache: "no-store" });
+        if (!response.ok) {
+            return {
+                status: "error",
+                message: `URLの取得に失敗しました (status: ${response.status})`,
+            };
+        }
+        html = await response.text();
+    } catch (error) {
+        return {
+            status: "error",
+            message: error instanceof Error ? error.message : "魚拓の取得に失敗しました",
+        };
+    }
+
+    const htmlSize = Buffer.byteLength(html);
+    if (htmlSize > MAX_HTML_BYTES) {
+        return {
+            status: "error",
+            message: `HTMLサイズが大きすぎます (${(htmlSize / (1024 * 1024)).toFixed(2)}MB)。${
+                MAX_HTML_BYTES / (1024 * 1024)
+            }MB以下のページで試してください。`,
+        };
+    }
+
+    const result = await submitCapture({
+        url,
+        notes: notes || undefined,
+        realm: realm || undefined,
+        html,
+    });
+
+    if (result.success) {
+        return {
+            status: "success",
+            message: result.mocked
+                ? "環境変数が未設定のためモックモードで魚拓を記録しました。"
+                : `魚拓を送信しました（Post ID: ${result.postId ?? "pending"}）。`,
+        };
+    }
+
+    return {
+        status: "error",
+        message: result.error ?? "魚拓の送信に失敗しました。",
     };
+}
 
+export default function CapturePage() {
     return (
-        <section className="grid" style={{ gap: 24 }}>
-            <div className="card grid">
-                <div>
-                    <p style={{ textTransform: "uppercase", color: "#38bdf8" }}>
-                        Gyotaku × Juno
-                    </p>
-                    <h2>魚拓作成ワークフロー</h2>
-                    <p style={{ color: "#cbd5f5", lineHeight: 1.6 }}>
-                        X（旧Twitter）などのリンクを貼り付け、魚拓保存時のプレビュー挙動をテストします。
-                        実装が進めばここから canister API を呼び出すフローに置き換えます。
-                    </p>
-                </div>
-                <form action={handleProbe} className="grid" style={{ gap: 8 }}>
-                    <label htmlFor="url">魚拓したいURL</label>
-                    <input
-                        id="url"
-                        name="url"
-                        placeholder="https://x.com/username/status/..."
-                        required
-                        style={{
-                            borderRadius: 10,
-                            border: "1px solid rgba(148,163,184,0.4)",
-                            padding: "12px 14px",
-                            background: "rgba(15,23,42,0.35)",
-                            color: "inherit",
-                        }}
-                    />
-                    <button className="cta-button" type="submit">
-                        プレビュー判定
-                    </button>
-                </form>
-            </div>
-            <section className="card grid">
-                <h3 style={{ margin: 0 }}>プレビュー結果</h3>
-                {!preview && (
-                    <p style={{ color: "#94a3b8" }}>
-                        まだURLが入力されていません。Xリンクを入力すると X 特化レイアウトに切り替わるかを確認できます。
-                    </p>
-                )}
-                {preview && (
-                    <div
-                        style={{
-                            borderRadius: 20,
-                            border: "1px solid rgba(148,163,184,0.2)",
-                            overflow: "hidden",
-                        }}
-                    >
-                        <div
-                            style={{
-                                height: 180,
-                                background:
-                                    preview.platform === "x"
-                                        ? "linear-gradient(135deg,#0f172a,#1d4ed8)"
-                                        : "linear-gradient(135deg,#0f172a,#0f766e)",
-                            }}
-                        />
-                        <div style={{ padding: 16, background: "#0b1120" }}>
-                            <p
-                                style={{
-                                    fontSize: 12,
-                                    textTransform: "uppercase",
-                                    letterSpacing: 1.2,
-                                    color: "#94a3b8",
-                                }}
-                            >
-                                {preview.platform === "x"
-                                    ? "X-Like Preview"
-                                    : "Generic Preview"}
-                            </p>
-                            <h4 style={{ margin: "4px 0 8px" }}>{preview.title}</h4>
-                            <a
-                                href={preview.url}
-                                target="_blank"
-                                rel="noreferrer"
-                                style={{ color: "#38bdf8" }}
-                            >
-                                {preview.url}
-                            </a>
-                        </div>
-                    </div>
-                )}
-            </section>
-        </section>
+        <main className="mx-auto max-w-4xl space-y-10 px-6 py-16 lg:px-8">
+            <header className="space-y-3">
+                <p className="text-xs font-semibold uppercase tracking-[6px] text-slate-500">
+                    Capture
+                </p>
+                <h1 className="text-3xl font-semibold tracking-tight text-foreground">
+                    魚拓を取得
+                </h1>
+                <p className="text-base leading-relaxed text-muted-foreground">
+                    元記事のURLや補足メモを入力し、Taggr canister へ投稿します。未認証の状態では送信が拒否される可能性があります。
+                </p>
+            </header>
+            <CaptureForm action={createCapture} initialState={initialState} />
+        </main>
     );
 }
