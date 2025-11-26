@@ -4,6 +4,8 @@ import type { Route } from "next";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
+import { fetchUserProfile } from "@/lib/taggr-client";
+import { getTaggrDomain } from "@/lib/taggr-config";
 
 type NavItem = {
     label: string;
@@ -12,7 +14,8 @@ type NavItem = {
 };
 
 const primaryNav: NavItem[] = [
-    { label: "HOME", description: "Global feed", href: "/" },
+    { label: "HOME", description: "Landing", href: "/" },
+    { label: "FEED", description: "Posts & comments", href: "/feed" },
     { label: "CAPTURE", description: "New gyotaku", href: "/capture" },
     { label: "ARCHIVE", description: "Immutable records", href: "/archive" },
     { label: "GOVERNANCE", description: "DAO & proposals", href: "/governance" },
@@ -22,9 +25,18 @@ const utilityNav: NavItem[] = [
     { label: "INBOX", description: "Notifications", href: "/inbox" },
     { label: "PROFILE", description: "Identity & wallet", href: "/profile" },
     { label: "SETTINGS", description: "Preferences", href: "/settings" },
+    { label: "HISTORY", description: "Activity log", href: "/history" },
+    { label: "WALLET", description: "Credits", href: "/wallet" },
 ];
 
-export function TaggrNavigationBar() {
+export async function TaggrNavigationBar() {
+    const domain = getTaggrDomain();
+    let profile = null;
+    try {
+        profile = await fetchUserProfile({ domain });
+    } catch (error) {
+        console.warn("failed to load profile for navbar", error);
+    }
     return (
         <header className="border-b border-border/50 bg-background/70 px-10 py-6 backdrop-blur">
             <div className="flex items-center justify-between gap-6">
@@ -51,9 +63,12 @@ export function TaggrNavigationBar() {
                     <Button variant="outline" size="sm" className="rounded-full">
                         Sign In
                     </Button>
-                    <Button size="sm" className="rounded-full">
-                        Post
-                    </Button>
+                    <Link href="/inbox" className="text-xs text-muted-foreground">
+                        Notifications ({profile?.notifications?.length ?? 0})
+                    </Link>
+                    <Link href="/post/new" className="rounded-full">
+                        <Button size="sm" className="rounded-full">Post</Button>
+                    </Link>
                 </div>
             </div>
         </header>

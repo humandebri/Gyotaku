@@ -12,6 +12,7 @@ use env::{
 use ic_cdk::api::{self, call::arg_data_raw};
 use ic_cdk_macros::query;
 use ic_ledger_types::AccountIdentifier;
+use serde::Serialize;
 use serde_bytes::ByteBuf;
 
 // Returns the delegate principal if one exists or returns the canonical one otherwise.
@@ -562,6 +563,38 @@ fn realm_search() {
             .collect::<Vec<_>>();
         reply(env::search::realm_search(state, ids, query))
     })
+}
+
+#[derive(Serialize)]
+struct CaptureDescriptor {
+    post_id: PostId,
+    bucket: String,
+    offset: u64,
+    len: u64,
+}
+
+#[export_name = "canister_query capture_descriptor"]
+fn capture_descriptor() {
+    let post_id: PostId = parse(&arg_data_raw());
+    read(|state| {
+        let descriptor = Post::get(state, &post_id).and_then(|post| {
+            post.files.iter().find_map(|(key, &(offset, len))| {
+                key.split_once('@').and_then(|(name, bucket)| {
+                    if name == "capture" {
+                        Some(CaptureDescriptor {
+                            post_id,
+                            bucket: bucket.to_string(),
+                            offset: offset as u64,
+                            len: len as u64,
+                        })
+                    } else {
+                        None
+                    }
+                })
+            })
+        });
+        reply(descriptor);
+    });
 }
 
 #[query]

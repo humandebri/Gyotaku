@@ -14,6 +14,7 @@ export type ArchiveSummary = {
     capturedAt: string;
     merkleRoot: string;
     status: "pending" | "verified" | "disputed";
+    postId?: number;
 };
 
 export const mockFeed: FeedPost[] = [
@@ -45,6 +46,7 @@ export const mockArchives: ArchiveSummary[] = [
         capturedAt: "2024-04-02T08:12:00Z",
         merkleRoot: "0x9d91...c81d",
         status: "verified",
+        postId: 1,
     },
     {
         id: "blog-441a",
@@ -53,6 +55,7 @@ export const mockArchives: ArchiveSummary[] = [
         capturedAt: "2024-04-05T11:05:00Z",
         merkleRoot: "0x1234...ffff",
         status: "pending",
+        postId: 2,
     },
     {
         id: "rumor-set",
@@ -61,5 +64,6 @@ export const mockArchives: ArchiveSummary[] = [
         capturedAt: "2024-04-06T19:45:00Z",
         merkleRoot: "0xabcd...8888",
         status: "disputed",
+        postId: 3,
     },
 ];

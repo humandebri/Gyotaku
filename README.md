@@ -28,3 +28,5 @@ To create a backup of the Taggr state, run:
 ## Local development and contributions
 
 Refer to the [local development](./docs/LOCAL_DEVELOPMENT.md) docs for instructions on how to work with Taggr locally.
+
+> Note: Taggr currently relies on the DFX replica described in that guide. PocketIC is useful for isolated canister tests, but running the frontend against PocketIC is not supported yet—use `dfx start`/`make start` for the full stack experience.

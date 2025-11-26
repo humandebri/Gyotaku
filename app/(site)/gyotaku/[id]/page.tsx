@@ -3,6 +3,7 @@ import Link from "next/link";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
 import { fetchPostSummary, fetchCaptureContent } from "@/lib/taggr-client";
+import { parseCaptureMetadata } from "@/lib/capture-metadata";
 
 export default async function GyotakuDetailPage({
     params,
@@ -19,7 +20,8 @@ export default async function GyotakuDetailPage({
         notFound();
     }
 
-    const capture = await fetchCaptureContent(summary.post);
+    const capture = await fetchCaptureContent(postId);
+    const metadata = parseCaptureMetadata(summary.post.body);
 
     return (
         <main className="mx-auto flex max-w-5xl flex-col gap-10 px-6 py-16 lg:px-8">
@@ -78,6 +80,44 @@ export default async function GyotakuDetailPage({
                         />
                     </CardContent>
                 </Card>
+                {metadata && (
+                    <Card>
+                        <CardHeader>
+                            <CardTitle className="text-xl">魚拓メタデータ</CardTitle>
+                        </CardHeader>
+                        <CardContent className="space-y-2 text-sm text-muted-foreground">
+                            <div>
+                                <span className="font-semibold text-foreground">URL: </span>
+                                <a
+                                    href={metadata.url}
+                                    target="_blank"
+                                    rel="noreferrer"
+                                    className="text-primary underline-offset-4 hover:underline"
+                                >
+                                    {metadata.url}
+                                </a>
+                            </div>
+                            {metadata.capturedAt && (
+                                <div>
+                                    <span className="font-semibold text-foreground">Captured At: </span>
+                                    {metadata.capturedAt}
+                                </div>
+                            )}
+                            {metadata.hash && (
+                                <div>
+                                    <span className="font-semibold text-foreground">Content Hash: </span>
+                                    <code>{metadata.hash}</code>
+                                </div>
+                            )}
+                            {metadata.notes && (
+                                <div>
+                                    <span className="font-semibold text-foreground">Notes:</span>
+                                    <p className="whitespace-pre-wrap">{metadata.notes}</p>
+                                </div>
+                            )}
+                        </CardContent>
+                    </Card>
+                )}
             </section>
         </main>
     );

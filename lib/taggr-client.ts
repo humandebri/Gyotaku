@@ -22,6 +22,12 @@ function resolveEnv() {
     const templateRaw = process.env.GYOTAKU_BUCKET_URL_TEMPLATE?.trim();
     const hostMissing = !hostRaw;
     const canisterMissing = !canisterRaw;
+    if (hostMissing && process.env.NODE_ENV === "production") {
+        throw new Error("GYOTAKU_IC_HOST が設定されていないため Taggr canister に接続できません");
+    }
+    if (canisterMissing && process.env.NODE_ENV === "production") {
+        throw new Error("GYOTAKU_CANISTER_ID が設定されていないため Taggr canister に接続できません");
+    }
     if (hostMissing && process.env.NODE_ENV !== "production") {
         console.warn(`環境変数 GYOTAKU_IC_HOST が未設定のため ${fallbackHost} を使用します`);
     }
@@ -347,11 +353,48 @@ export async function fetchPostSummary(postId: number): Promise<PersonalFeedItem
     return posts[0] ?? null;
 }
 
+export async function fetchThread(postId: number): Promise<PersonalFeedItem[]> {
+    return queryJson("thread", [postId], (data) => parsePostEntries(data));
+}
+
+type CaptureDescriptor = {
+    postId: number;
+    bucket: string;
+    offset: number;
+    len: number;
+};
+
+async function fetchCaptureDescriptor(postId: number): Promise<CaptureDescriptor | null> {
+    return queryJson("capture_descriptor", [postId], (data) => {
+        if (!data) {
+            return null;
+        }
+        if (!isRecord(data)) {
+            throw new Error("capture descriptor が不正です");
+        }
+        const { post_id, bucket, offset, len } = data;
+        return {
+            postId: Number(post_id),
+            bucket: String(bucket),
+            offset: Number(offset),
+            len: Number(len),
+        };
+    });
+}
+
 export type CaptureSubmission = {
     url: string;
     notes?: string;
     realm?: string;
     html: string;
+    capturedAt?: string;
+    contentHash?: string;
+};
+
+export type TextPostSubmission = {
+    body: string;
+    realm?: string;
+    parent?: number;
 };
 
 export type CaptureResult = {
@@ -415,27 +458,35 @@ export async function submitCapture(payload: CaptureSubmission): Promise<Capture
     }
 }
 
-function formatCaptureBody({ url, notes }: CaptureSubmission) {
+function formatCaptureBody({ url, notes, capturedAt, contentHash }: CaptureSubmission) {
     const trimmedNotes = notes?.trim();
-    return [`Captured URL: ${url.trim()}`, trimmedNotes ? `Notes: ${trimmedNotes}` : null]
-        .filter(Boolean)
-        .join("\n\n");
+    const sections = [
+        `Captured URL: ${url.trim()}`,
+        `Captured At: ${capturedAt ?? new Date().toISOString()}`,
+    ];
+    if (contentHash) {
+        sections.push(`Content Hash: ${contentHash}`);
+    }
+    if (trimmedNotes) {
+        sections.push(`Notes:\n${trimmedNotes}`);
+    }
+    return sections.join("\n\n");
 }
 
-export async function fetchCaptureContent(post: TaggrPost): Promise<{
+export async function fetchCaptureContent(postId: number): Promise<{
     html: string;
     mocked: boolean;
 }> {
-    const descriptor = findCaptureDescriptor(post);
+    const descriptor = await fetchCaptureDescriptor(postId);
     if (!descriptor) {
         return {
-            html: fallbackCaptureHtml(post.id),
+            html: fallbackCaptureHtml(postId),
             mocked: true,
         };
     }
 
     try {
-        const url = buildBucketAssetUrl(descriptor.bucketId, descriptor.offset, descriptor.len);
+        const url = buildBucketAssetUrl(descriptor.bucket, descriptor.offset, descriptor.len);
         const response = await fetch(url, { cache: "no-store" });
         if (!response.ok) {
             throw new Error(`bucket fetch failed (${response.status})`);
@@ -445,27 +496,42 @@ export async function fetchCaptureContent(post: TaggrPost): Promise<{
     } catch (error) {
         console.error("capture fetch failed", error);
         return {
-            html: fallbackCaptureHtml(post.id),
+            html: fallbackCaptureHtml(postId),
             mocked: true,
         };
     }
 }
 
-function findCaptureDescriptor(post: TaggrPost) {
-    const files = post.files as Record<string, [number, number]> | undefined;
-    if (!files) {
-        return null;
+export async function submitTextPost(payload: TextPostSubmission): Promise<CaptureResult> {
+    if (!payload.body.trim()) {
+        return { success: false, error: "本文が空です" };
     }
-    for (const [key, value] of Object.entries(files)) {
-        if (key.startsWith("capture@")) {
-            const [, bucketId] = key.split("@");
-            if (!bucketId || value.length < 2) {
-                continue;
-            }
-            return { bucketId, offset: value[0], len: value[1] };
+    if (env.hostMissing || env.canisterMissing) {
+        return { success: true, postId: null, mocked: true };
+    }
+    const arg = IDL.encode(addPostArgsCodec, [
+        payload.body,
+        [],
+        payload.parent ? [BigInt(payload.parent)] : [],
+        payload.realm ? [payload.realm] : [],
+        [],
+    ]);
+    try {
+        const reply = await callUpdateRaw("add_post", arg);
+        if (!reply || reply.length === 0) {
+            return { success: true, postId: null };
         }
+        const [result] = IDL.decode([addPostResultCodec], reply);
+        if ("Ok" in result) {
+            return { success: true, postId: Number(result.Ok) };
+        }
+        return { success: false, error: result.Err };
+    } catch (error) {
+        return {
+            success: false,
+            error: error instanceof Error ? error.message : "post failed",
+        };
     }
-    return null;
 }
 
 function buildBucketAssetUrl(bucketId: string, offset: number, len: number) {
