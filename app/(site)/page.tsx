@@ -103,7 +103,7 @@ function FeedSection({
         <section className="space-y-10">
             <SectionIntro
                 eyebrow="Timeline"
-                title="Gyotaku Realmの要約をフォローアップ"
+                title="Gyotakuジャンルの要約をフォローアップ"
                 description="リアルタイムフィードの復帰前に、旧Taggrのキューを魚拓ワークフローへ取り込みます。"
             />
             <div className="grid gap-8 md:grid-cols-2">
@@ -130,7 +130,7 @@ function FeedSection({
                                             {truncate(post.body)}
                                         </CardTitle>
                                         <span className="text-sm font-medium text-primary">
-                                            {post.realm ? `#${post.realm}` : `#${domain}`}
+                                            {post.realm ? `ジャンル: ${post.realm}` : `ジャンル: ${domain}`}
                                         </span>
                                     </div>
                                     <p className="text-sm text-muted-foreground">by {meta.author_name}</p>

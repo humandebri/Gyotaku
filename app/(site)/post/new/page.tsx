@@ -4,6 +4,15 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 
 const initialState = { status: "idle", message: "" } as const;
+const GENRE_OPTIONS = [
+    { value: "", label: "ジャンルを選択（任意）" },
+    { value: "news", label: "ニュース" },
+    { value: "politics", label: "政治・社会" },
+    { value: "business", label: "ビジネス" },
+    { value: "tech", label: "テクノロジー" },
+    { value: "culture", label: "カルチャー" },
+    { value: "life", label: "ライフスタイル" },
+];
 
 async function createPost(_prevState: typeof initialState, formData: FormData) {
     "use server";
@@ -37,18 +46,20 @@ export default function NewPostPage() {
                                 name="body"
                                 rows={8}
                                 required
-                                className="w-full rounded-lg border border-border bg-card px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-primary"
+                                className="form-input"
                             />
                         </div>
                         <div className="space-y-2">
                             <label className="text-sm font-semibold" htmlFor="realm">
-                                Realm (任意)
+                                ジャンル (任意)
                             </label>
-                            <input
-                                id="realm"
-                                name="realm"
-                                className="w-full rounded-lg border border-border bg-card px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-primary"
-                            />
+                            <select id="realm" name="realm" className="form-input">
+                                {GENRE_OPTIONS.map((option) => (
+                                    <option key={option.value} value={option.value}>
+                                        {option.label}
+                                    </option>
+                                ))}
+                            </select>
                         </div>
                         <Button type="submit">投稿する</Button>
                     </form>

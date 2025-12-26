@@ -51,8 +51,8 @@ export default async function GyotakuDetailPage({
                             </p>
                             <Separator />
                             <div className="text-xs text-slate-500">
-                                <div>Realm: {summary.post.realm ?? "N/A"}</div>
-                                <div>Tags: {summary.post.tags.join(", ") || "N/A"}</div>
+                                <div>ジャンル: {summary.post.realm ?? "N/A"}</div>
+                                <div>関連タグ: {summary.post.tags.join(", ") || "N/A"}</div>
                             </div>
                         </article>
                         <Link

@@ -34,7 +34,7 @@ export default function CaptureForm({
                 <CardHeader>
                     <CardTitle className="text-xl">魚拓を作成</CardTitle>
                     <CardDescription>
-                        URL を入力し、必要なら補足メモや Realm を指定してください。投稿は Taggr canister へ送信されます。
+                        URL を入力し、必要なら補足メモやジャンルを指定してください。投稿は Taggr canister へ送信されます。
                     </CardDescription>
                 </CardHeader>
                 <CardContent>

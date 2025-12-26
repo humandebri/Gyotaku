@@ -623,7 +623,7 @@ fn create_realm() {
     mutate(|state| {
         let (_name, _realm): (String, Realm) = parse(&arg_data_raw());
         let _ = state;
-        reply(Err("realm creation is disabled on Gyotaku".into()))
+        reply(Err::<(), String>("realm creation is disabled on Gyotaku".into()))
     })
 }
 
