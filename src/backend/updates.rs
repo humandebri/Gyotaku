@@ -621,8 +621,9 @@ fn realm_clean_up() {
 #[export_name = "canister_update create_realm"]
 fn create_realm() {
     mutate(|state| {
-        let (name, realm): (String, Realm) = parse(&arg_data_raw());
-        reply(realms::create_realm(state, caller(state), name, realm))
+        let (_name, _realm): (String, Realm) = parse(&arg_data_raw());
+        let _ = state;
+        reply(Err("realm creation is disabled on Gyotaku".into()))
     })
 }
 

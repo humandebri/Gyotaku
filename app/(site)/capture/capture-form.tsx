@@ -9,6 +9,16 @@ export type CaptureFormState = {
     message: string;
 };
 
+const GENRE_OPTIONS = [
+    { value: "", label: "ジャンルを選択（任意）" },
+    { value: "news", label: "ニュース" },
+    { value: "politics", label: "政治・社会" },
+    { value: "business", label: "ビジネス" },
+    { value: "tech", label: "テクノロジー" },
+    { value: "culture", label: "カルチャー" },
+    { value: "life", label: "ライフスタイル" },
+];
+
 export default function CaptureForm({
     action,
     initialState,
@@ -39,7 +49,7 @@ export default function CaptureForm({
                                 type="url"
                                 required
                                 placeholder="https://example.com/article"
-                                className="w-full rounded-lg border border-border bg-card px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-primary"
+                                className="form-input"
                             />
                         </div>
                         <div className="space-y-2">
@@ -51,20 +61,20 @@ export default function CaptureForm({
                                 name="notes"
                                 rows={4}
                                 placeholder="検証コメントや追記メモを残せます"
-                                className="w-full rounded-lg border border-border bg-card px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-primary"
+                                className="form-input"
                             />
                         </div>
                         <div className="space-y-2">
                             <label className="text-sm font-medium" htmlFor="realm">
-                                Realm（任意）
+                                ジャンル（任意）
                             </label>
-                            <input
-                                id="realm"
-                                name="realm"
-                                type="text"
-                                placeholder="DAO / GYOTAKU など"
-                                className="w-full rounded-lg border border-border bg-card px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-primary"
-                            />
+                            <select id="realm" name="realm" className="form-input">
+                                {GENRE_OPTIONS.map((option) => (
+                                    <option key={option.value} value={option.value}>
+                                        {option.label}
+                                    </option>
+                                ))}
+                            </select>
                         </div>
                         <FormStatusButton label="魚拓を送信" />
                     </form>

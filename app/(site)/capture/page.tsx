@@ -254,7 +254,7 @@ export default function CapturePage() {
                     魚拓を取得
                 </h1>
                 <p className="text-base leading-relaxed text-muted-foreground">
-                    元記事のURLや補足メモを入力し、Taggr canister へ投稿します。未認証の状態では送信が拒否される可能性があります。
+                    元記事のURLや補足メモを入力し、ジャンルを選択して保存します。未認証の状態では送信が拒否される可能性があります。
                 </p>
             </header>
             <CaptureForm action={createCapture} initialState={initialState} />

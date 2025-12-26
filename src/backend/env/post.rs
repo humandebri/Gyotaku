@@ -2,7 +2,7 @@ use std::cmp::{Ordering, PartialOrd};
 
 use super::config::DOWNVOTE_REACTION_ID;
 use super::*;
-use super::{storage::Storage, user::UserId};
+use super::{realms, storage::Storage, user::UserId};
 use crate::env::tip::Tip;
 use crate::mutate;
 use ic_cdk::caller;
@@ -528,7 +528,11 @@ impl Post {
             },
         };
         if let Some(realm_id) = &realm {
-            if user.organic() && parent.is_none() && !user.realms.contains(realm_id) {
+            if user.organic()
+                && parent.is_none()
+                && !user.realms.contains(realm_id)
+                && !realms::is_public_genre(realm_id)
+            {
                 return Err(format!("not a member of the realm {}", realm_id));
             }
             if let Some(realm) = state.realms.get(realm_id) {

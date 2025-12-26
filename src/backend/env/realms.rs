@@ -38,6 +38,26 @@ pub fn validate_realm_id(realm_id: &str) -> Result<(), String> {
     Ok(())
 }
 
+// 固定ジャンルとして運営が提供する Realm 一覧。
+const PUBLIC_GENRES: &[(&str, &str)] = &[
+    ("news", "ニュースや時事トピックの魚拓を保管するジャンル。"),
+    ("politics", "政治・社会に関する議論や記録のためのジャンル。"),
+    ("business", "ビジネス・経済系の記事を扱うジャンル。"),
+    ("tech", "テクノロジーやプロダクトのアーカイブ用ジャンル。"),
+    ("culture", "カルチャー・アート・エンタメ系の記録用ジャンル。"),
+    ("life", "生活・ライフスタイル系の魚拓をまとめるジャンル。"),
+];
+
+pub fn public_genres() -> &'static [(&'static str, &'static str)] {
+    PUBLIC_GENRES
+}
+
+pub fn is_public_genre(realm_id: &str) -> bool {
+    PUBLIC_GENRES
+        .iter()
+        .any(|(id, _)| id.eq_ignore_ascii_case(realm_id))
+}
+
 #[derive(Default, Serialize, Deserialize)]
 pub struct Realm {
     pub cleanup_penalty: Credits,
@@ -336,6 +356,25 @@ pub(crate) mod tests {
                 500 + expected_revenue
             );
             assert_eq!(state.principal_to_user(pr(2)).unwrap().rewards(), 0);
+        })
+    }
+
+    #[test]
+    fn test_public_genre_allows_post_without_membership() {
+        mutate(|state| {
+            state.init();
+            create_user(state, pr(0));
+            let result = Post::create(
+                state,
+                "genre post".to_string(),
+                &[],
+                pr(0),
+                WEEK,
+                None,
+                Some("news".into()),
+                None,
+            );
+            assert!(result.is_ok());
         })
     }
 

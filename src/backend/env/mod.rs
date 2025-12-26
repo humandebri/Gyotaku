@@ -624,6 +624,14 @@ impl State {
                 Realm::new("The default stalwarts realm. Only stalwarts can post here.".into()),
             );
         }
+        for (realm_id, description) in realms::public_genres() {
+            if !self.realms.contains_key(*realm_id) {
+                self.realms.insert(
+                    (*realm_id).to_string(),
+                    Realm::new((*description).to_string()),
+                );
+            }
+        }
         if self.auction.amount == 0 {
             self.auction.amount = CONFIG.weekly_auction_size_tokens_max;
         }

@@ -1,5 +1,20 @@
 import type { Metadata } from "next";
+import { Noto_Sans_JP, Noto_Serif_JP } from "next/font/google";
 import "./globals.css";
+
+const notoSans = Noto_Sans_JP({
+    weight: ["400", "500", "700"],
+    subsets: ["latin"],
+    display: "swap",
+    variable: "--font-sans",
+});
+
+const notoSerif = Noto_Serif_JP({
+    weight: ["400", "600", "700"],
+    subsets: ["latin"],
+    display: "swap",
+    variable: "--font-serif",
+});
 
 export const metadata: Metadata = {
     title: "Gyotaku Portal",
@@ -26,7 +41,7 @@ export default function RootLayout({
     children,
 }: Readonly<{ children: React.ReactNode }>) {
     return (
-        <html lang="ja">
+        <html lang="ja" className={`${notoSans.variable} ${notoSerif.variable}`}>
             <head>
                 <meta name="mark" content="OG" />
             </head>
