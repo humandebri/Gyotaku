@@ -10,7 +10,7 @@ use super::*;
 use env::{
     canisters::get_full_neuron,
     config::CONFIG,
-    post::{Extension, Post, PostId},
+    post::{Extension, Post, PostId, Visibility},
     user::{Draft, User, UserId},
     State,
 };
@@ -523,6 +523,38 @@ async fn commit_post() -> Result<PostId, String> {
     } else {
         Err("no post data found".into())
     }
+}
+
+#[update]
+fn set_post_access(post_id: PostId, visibility: String, price: Option<Credits>) -> Result<(), String> {
+    mutate(|state| {
+        let user_id = state
+            .principal_to_user(caller(state))
+            .ok_or("user not found")?
+            .id;
+        Post::mutate(state, &post_id, |post| {
+            if post.user != user_id {
+                return Err("only author can change visibility".into());
+            }
+            let visibility = Visibility::parse(&visibility)?;
+            if matches!(visibility, Visibility::Paid) {
+                let price = price.ok_or("paid post missing price")?;
+                if price == 0 {
+                    return Err("paid post price must be positive".into());
+                }
+                post.access.price = Some(price);
+            } else {
+                post.access.price = None;
+            }
+            post.access.visibility = visibility;
+            Ok(())
+        })
+    })
+}
+
+#[update]
+fn purchase_post(post_id: PostId) -> Result<(), String> {
+    mutate(|state| state.purchase_post(caller(state), post_id))
 }
 
 #[update]

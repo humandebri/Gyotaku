@@ -126,6 +126,7 @@ service : () -> {
   edit_post : (nat64, text, vec record { text; blob }, text, opt text) -> (
       Result_1,
     );
+  purchase_post : (nat64) -> (Result_1);
   force_emergency_upgrade : () -> (bool);
   get_neuron_info : () -> (Result_2);
   get_transactions : (GetBlocksRequest) -> (GetTransactionsResponse) query;
@@ -148,6 +149,7 @@ service : () -> {
   link_cold_wallet : (nat64) -> (Result_1);
   prod_release : () -> (bool);
   propose_release : (nat64, text, vec nat64, blob) -> (Result_4);
+  set_post_access : (nat64, text, opt nat64) -> (Result_1);
   set_emergency_release : (blob) -> ();
   stable_mem_read : (nat64) -> (vec record { nat64; blob }) query;
   unlink_cold_wallet : () -> (Result_1);

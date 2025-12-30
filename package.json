@@ -7,8 +7,6 @@
         "build": "next build && rm -rf dist/frontend && mkdir -p dist && mv out dist/frontend",
         "start": "next start",
         "lint": "next lint",
-        "juno:dev": "juno hosting dev --mode staging",
-        "juno:deploy": "juno hosting deploy",
         "test:e2e": "playwright test",
         "install:e2e": "playwright install chromium --with-deps",
         "format": "prettier --write .",
@@ -29,9 +27,6 @@
         "tailwind-merge": "^2.6.0"
     },
     "devDependencies": {
-        "@junobuild/cli": "latest",
-        "@junobuild/config": "latest",
-        "@junobuild/nextjs-plugin": "latest",
         "@playwright/test": "1.56.1",
         "@types/node": "^22.7.5",
         "@types/react": "^19.0.1",

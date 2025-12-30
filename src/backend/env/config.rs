@@ -133,6 +133,7 @@ pub struct Config {
     pub max_funding_amount: u64,
 
     pub post_deletion_penalty_factor: u32,
+    pub purchase_fee_bps: u64,
 
     #[serde(with = "string")]
     pub neuron_id: u64,
@@ -355,6 +356,8 @@ pub const CONFIG: &Config = &Config {
     max_funding_amount: 500000,
 
     neuron_id: 16737374299031693047,
+
+    purchase_fee_bps: 500,
 
     #[cfg(feature = "dev")]
     proposal_escrow_amount_xdr: 1,

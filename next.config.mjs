@@ -1,5 +1,3 @@
-import { withJuno } from "@junobuild/nextjs-plugin";
-
 /** @type {import('next').NextConfig} */
 const nextConfig = {
     output: "export",
@@ -11,4 +9,4 @@ const nextConfig = {
     },
 };
 
-export default withJuno(nextConfig);
+export default nextConfig;

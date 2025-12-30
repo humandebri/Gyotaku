@@ -129,6 +129,7 @@ export type TaggrPost = {
     realm: string | null;
     timestamp?: number;
     files?: Record<string, [number, number]>;
+    access?: AccessControl;
     [key: string]: unknown;
 };
 
@@ -146,7 +147,18 @@ export type TaggrPostMeta = {
     realm_color: string | null;
     nsfw: boolean;
     max_downvotes_reached: boolean;
+    visibility?: Visibility;
+    price?: number;
+    viewer_can_view?: boolean;
+    viewer_has_purchased?: boolean;
     [key: string]: unknown;
+};
+
+export type Visibility = "draft" | "public" | "followers_only" | "paid";
+
+export type AccessControl = {
+    visibility: Visibility;
+    price?: number;
 };
 
 export type PersonalFeedItem = {
@@ -159,7 +171,7 @@ function toPost(raw: unknown): TaggrPost {
         throw new Error("投稿データが不正です");
     }
 
-    const { id, body, user, tags, realm = null, timestamp, ...rest } = raw;
+    const { id, body, user, tags, realm = null, timestamp, access, ...rest } = raw;
     assertFiniteNumber(id, "post.id");
     assertString(body, "post.body");
     assertFiniteNumber(user, "post.user");
@@ -178,6 +190,7 @@ function toPost(raw: unknown): TaggrPost {
         tags: normalizedTags,
         realm,
         timestamp,
+        access: parseAccess(access),
         ...rest,
     };
 }
@@ -213,6 +226,10 @@ function toPostMeta(raw: unknown): TaggrPostMeta {
         realm_color = null,
         nsfw,
         max_downvotes_reached,
+        visibility,
+        price,
+        viewer_can_view,
+        viewer_has_purchased,
         ...rest
     } = raw;
 
@@ -232,8 +249,56 @@ function toPostMeta(raw: unknown): TaggrPostMeta {
         realm_color,
         nsfw,
         max_downvotes_reached,
+        visibility: parseVisibility(visibility),
+        price: parseOptionalNumber(price, "meta.price"),
+        viewer_can_view: parseOptionalBoolean(viewer_can_view, "meta.viewer_can_view"),
+        viewer_has_purchased: parseOptionalBoolean(viewer_has_purchased, "meta.viewer_has_purchased"),
         ...rest,
     };
+}
+
+function parseAccess(raw: unknown): AccessControl | undefined {
+    if (!raw) {
+        return undefined;
+    }
+    if (!isRecord(raw)) {
+        throw new Error("post.access が不正です");
+    }
+    const visibility = parseVisibility(raw.visibility);
+    const price = parseOptionalNumber(raw.price, "post.access.price");
+    if (!visibility) {
+        return undefined;
+    }
+    return {
+        visibility,
+        price: price ?? undefined,
+    };
+}
+
+function parseVisibility(value: unknown): Visibility | undefined {
+    if (value === undefined || value === null) {
+        return undefined;
+    }
+    if (value === "draft" || value === "public" || value === "followers_only" || value === "paid") {
+        return value;
+    }
+    throw new Error("visibility が不正です");
+}
+
+function parseOptionalNumber(value: unknown, label: string) {
+    if (value === undefined || value === null) {
+        return undefined;
+    }
+    assertFiniteNumber(value, label);
+    return value;
+}
+
+function parseOptionalBoolean(value: unknown, label: string) {
+    if (value === undefined || value === null) {
+        return undefined;
+    }
+    assertBoolean(value, label);
+    return value;
 }
 
 function parsePostEntries(raw: unknown) {
@@ -389,12 +454,16 @@ export type CaptureSubmission = {
     html: string;
     capturedAt?: string;
     contentHash?: string;
+    visibility?: Visibility;
+    price?: number;
 };
 
 export type TextPostSubmission = {
     body: string;
     realm?: string;
     parent?: number;
+    visibility?: Visibility;
+    price?: number;
 };
 
 export type CaptureResult = {
@@ -437,7 +506,7 @@ export async function submitCapture(payload: CaptureSubmission): Promise<Capture
         attachments,
         [],
         payload.realm ? [payload.realm] : [],
-        [],
+        buildAccessExtension(payload.visibility, payload.price),
     ]);
 
     try {
@@ -514,7 +583,7 @@ export async function submitTextPost(payload: TextPostSubmission): Promise<Captu
         [],
         payload.parent ? [BigInt(payload.parent)] : [],
         payload.realm ? [payload.realm] : [],
-        [],
+        buildAccessExtension(payload.visibility, payload.price),
     ]);
     try {
         const reply = await callUpdateRaw("add_post", arg);
@@ -534,12 +603,55 @@ export async function submitTextPost(payload: TextPostSubmission): Promise<Captu
     }
 }
 
+const purchasePostArgsCodec = [IDL.Nat64];
+const purchasePostResultCodec = IDL.Variant({
+    Ok: IDL.Null,
+    Err: IDL.Text,
+});
+
+export async function purchasePost(postId: number): Promise<CaptureResult> {
+    if (env.hostMissing || env.canisterMissing) {
+        return { success: false, error: "課金処理は本番環境でのみ有効です" };
+    }
+    const arg = IDL.encode(purchasePostArgsCodec, [BigInt(postId)]);
+    try {
+        const reply = await callUpdateRaw("purchase_post", arg);
+        if (!reply || reply.length === 0) {
+            return { success: true };
+        }
+        const [result] = IDL.decode([purchasePostResultCodec], reply);
+        if ("Ok" in result) {
+            return { success: true };
+        }
+        return { success: false, error: result.Err };
+    } catch (error) {
+        return {
+            success: false,
+            error: error instanceof Error ? error.message : "purchase failed",
+        };
+    }
+}
+
 function buildBucketAssetUrl(bucketId: string, offset: number, len: number) {
     const replaced = env.bucketTemplate.replace("{canister}", bucketId);
     const url = new URL(replaced);
     url.searchParams.set("offset", offset.toString());
     url.searchParams.set("len", len.toString());
     return url.toString();
+}
+
+function buildAccessExtension(visibility?: Visibility, price?: number) {
+    if (!visibility) {
+        return [];
+    }
+    const access = {
+        Access: {
+            visibility,
+            price: price ?? null,
+        },
+    };
+    const json = JSON.stringify(access);
+    return Array.from(new TextEncoder().encode(json));
 }
 
 function fallbackCaptureHtml(postId: number) {

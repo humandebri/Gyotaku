@@ -1,8 +1,9 @@
 import { notFound } from "next/navigation";
 import Link from "next/link";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
-import { fetchPostSummary, fetchCaptureContent } from "@/lib/taggr-client";
+import { fetchPostSummary, fetchCaptureContent, purchasePost } from "@/lib/taggr-client";
 import { parseCaptureMetadata } from "@/lib/capture-metadata";
 
 export default async function GyotakuDetailPage({
@@ -22,6 +23,15 @@ export default async function GyotakuDetailPage({
 
     const capture = await fetchCaptureContent(postId);
     const metadata = parseCaptureMetadata(summary.post.body);
+    const visibility = summary.post.access?.visibility ?? "public";
+    const price = summary.post.access?.price;
+    const viewerCanView = summary.meta.viewer_can_view ?? visibility === "public";
+    const viewerHasPurchased = summary.meta.viewer_has_purchased ?? false;
+
+    async function purchaseAccess() {
+        "use server";
+        await purchasePost(postId);
+    }
 
     return (
         <main className="mx-auto flex max-w-5xl flex-col gap-10 px-6 py-16 lg:px-8">
@@ -72,12 +82,32 @@ export default async function GyotakuDetailPage({
                             </CardDescription>
                         )}
                     </CardHeader>
-                    <CardContent className="p-0">
-                        <iframe
-                            srcDoc={capture.html}
-                            className="h-[600px] w-full border-t border-border"
-                            title={`Gyotaku capture ${postId}`}
-                        />
+                    <CardContent className="space-y-4 p-6">
+                        {visibility === "paid" && !viewerCanView && (
+                            <div className="rounded-xl border border-dashed border-border bg-muted/40 p-4 text-sm text-muted-foreground">
+                                <p>この魚拓は有料コンテンツです。</p>
+                                {price ? <p className="mt-2">価格: {price} クレジット</p> : null}
+                                <form action={purchaseAccess} className="mt-4">
+                                    <Button className="w-full" type="submit">
+                                        購入して閲覧する
+                                    </Button>
+                                </form>
+                            </div>
+                        )}
+                        {visibility === "paid" && viewerHasPurchased && (
+                            <p className="text-xs text-muted-foreground">購入済み</p>
+                        )}
+                        {viewerCanView ? (
+                            <iframe
+                                srcDoc={capture.html}
+                                className="h-[600px] w-full border border-border"
+                                title={`Gyotaku capture ${postId}`}
+                            />
+                        ) : (
+                            <p className="text-sm text-muted-foreground">
+                                公開範囲により本文は非表示です。
+                            </p>
+                        )}
                     </CardContent>
                 </Card>
                 {metadata && (

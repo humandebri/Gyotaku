@@ -109,6 +109,8 @@ pub struct User {
     pub feeds: Vec<Vec<String>>,
     pub followees: BTreeSet<UserId>,
     pub followers: BTreeSet<UserId>,
+    #[serde(default)]
+    pub purchased_posts: BTreeSet<PostId>,
     pub timestamp: u64,
     messages: u64,
     pub last_activity: u64,
@@ -158,12 +160,17 @@ impl User {
     }
 
     pub fn should_see(&self, state: &State, realm: Option<&RealmId>, post: &Post) -> bool {
-        !post.matches_filters(realm, &self.filters)
+        state.can_view_post(Some(self), post)
+            && !post.matches_filters(realm, &self.filters)
             && state
                 .users
                 .get(&post.user)
                 .map(|author| self.accepts(post.user, &author.get_filter()))
                 .unwrap_or(true)
+    }
+
+    pub fn has_purchased(&self, post_id: PostId) -> bool {
+        self.purchased_posts.contains(&post_id)
     }
 
     pub fn accepts(&self, user_id: UserId, filter: &UserFilter) -> bool {
@@ -216,6 +223,7 @@ impl User {
             feeds: Default::default(),
             followees: vec![id].into_iter().collect(),
             followers: Default::default(),
+            purchased_posts: Default::default(),
             accounting: Default::default(),
             controllers: Default::default(),
             controlled_realms: Default::default(),

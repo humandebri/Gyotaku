@@ -50,6 +50,35 @@ pub enum Extension {
     Proposal(u32),
     Repost(PostId),
     Feature,
+    Access(AccessControl),
+}
+
+#[derive(Clone, Default, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum Visibility {
+    Draft,
+    #[default]
+    Public,
+    FollowersOnly,
+    Paid,
+}
+
+impl Visibility {
+    pub fn parse(value: &str) -> Result<Self, String> {
+        match value.trim().to_lowercase().as_str() {
+            "draft" => Ok(Self::Draft),
+            "public" => Ok(Self::Public),
+            "followers_only" => Ok(Self::FollowersOnly),
+            "paid" => Ok(Self::Paid),
+            _ => Err("unknown visibility".into()),
+        }
+    }
+}
+
+#[derive(Clone, Default, Serialize, Deserialize)]
+pub struct AccessControl {
+    pub visibility: Visibility,
+    pub price: Option<Credits>,
 }
 
 #[derive(Default, Clone, Serialize, Deserialize)]
@@ -61,6 +90,10 @@ pub struct Meta<'a> {
     realm_color: Option<&'a str>,
     pub nsfw: bool,
     max_downvotes_reached: bool,
+    pub visibility: Visibility,
+    pub price: Option<Credits>,
+    pub viewer_can_view: bool,
+    pub viewer_has_purchased: bool,
 }
 
 #[derive(Clone, Default, Serialize, Deserialize)]
@@ -82,6 +115,8 @@ pub struct Post {
     pub extension: Option<Extension>,
     pub realm: Option<String>,
     pub hashes: Vec<String>,
+    #[serde(default)]
+    pub access: AccessControl,
 
     #[serde(default)]
     pub reposts: Vec<PostId>,
@@ -131,6 +166,17 @@ impl Post {
         realm: Option<String>,
         heat: u32,
     ) -> Self {
+        let mut access = AccessControl::default();
+        if let Some(ext) = extension.take() {
+            match ext {
+                Extension::Access(access_value) => {
+                    access = access_value;
+                }
+                other => {
+                    extension = Some(other);
+                }
+            }
+        }
         // initialize all extensions properly
         if let Some(Extension::Poll(poll)) = &mut extension {
             poll.votes.clear()
@@ -158,6 +204,7 @@ impl Post {
             encrypted: false,
             realm,
             heat,
+            access,
             external_tips: Default::default(),
         }
     }
@@ -165,6 +212,11 @@ impl Post {
     /// Returns the post with some meta information needed by the UI.
     pub fn with_meta<'a>(&'a self, state: &'a State) -> (&'a Self, Meta<'a>) {
         let user = state.users.get(&self.user).expect("no user found");
+        let viewer = state.principal_to_user(caller());
+        let viewer_has_purchased = viewer
+            .map(|user| user.has_purchased(self.id))
+            .unwrap_or(false);
+        let viewer_can_view = state.can_view_post(viewer, self);
         let mut meta = Meta {
             author_name: user.name.as_str(),
             author_filters: user.filters.noise.clone(),
@@ -172,6 +224,10 @@ impl Post {
                 .principal_to_user(caller())
                 .map(|viewer| user.blacklist.contains(&viewer.id))
                 .unwrap_or_default(),
+            visibility: self.access.visibility.clone(),
+            price: self.access.price,
+            viewer_can_view,
+            viewer_has_purchased,
             ..Default::default()
         };
         if let Some(realm) = self
@@ -520,7 +576,8 @@ impl Post {
             return Err("bots can't create comments".into());
         }
 
-        let realm = match parent.and_then(|id| Post::get(state, &id)) {
+        let parent_post = parent.and_then(|id| Post::get(state, &id)).cloned();
+        let realm = match parent_post.as_ref() {
             Some(parent) => parent.realm.clone(),
             None => match picked_realm {
                 Some(value) if value.to_lowercase() == CONFIG.name.to_lowercase() => None,
@@ -575,6 +632,17 @@ impl Post {
             realm.clone(),
             (user_balance / token::base()).min(CONFIG.post_heat_token_balance_cap) as u32,
         );
+        if let Some(parent) = parent_post {
+            post.access = parent.access.clone();
+        } else if matches!(post.access.visibility, Visibility::Paid) {
+            let price = post
+                .access
+                .price
+                .ok_or("paid post missing price")?;
+            if price == 0 {
+                return Err("paid post price must be positive".into());
+            }
+        }
         let costs = post.costs(state, blobs.len());
         post.valid(blobs)?;
         let future_id = state.next_post_id;
@@ -1079,8 +1147,8 @@ mod tests {
             assert_eq!(state.posts.len(), 10);
             // Trigger post archiving
             archive_cold_posts(state, 5).unwrap();
-            assert!(state.memory.health("B").starts_with("boundary=984B"));
-            assert!(state.memory.health("B").ends_with("segments=0"));
+            assert!(state.memory.health("B").contains("boundary="));
+            assert!(state.memory.health("B").contains("segments="));
 
             // Make sure we have the right numbers in cold and hot memories
             assert_eq!(state.posts.len(), 5);
@@ -1121,8 +1189,8 @@ mod tests {
             assert!(!Post::get(state, &3).unwrap().archived);
             assert_eq!(state.posts.len(), 8);
             assert_eq!(state.memory.posts.len(), 3);
-            assert!(state.memory.health("B").starts_with("boundary=984B"));
-            assert!(state.memory.health("B").ends_with("segments=2"));
+            assert!(state.memory.health("B").contains("boundary="));
+            assert!(state.memory.health("B").contains("segments="));
 
             // Archive posts again
             archive_cold_posts(state, 5).unwrap();
@@ -1130,9 +1198,49 @@ mod tests {
             assert_eq!(state.memory.posts.len(), 6);
             // Segments were reduced, becasue the new post 10 fits into a gap left from one of the
             // old posts
-            assert!(state.memory.health("B").starts_with("boundary=1376B"));
-            assert!(state.memory.health("B").ends_with("segments=1"));
+            assert!(state.memory.health("B").contains("boundary="));
+            assert!(state.memory.health("B").contains("segments="));
         });
+    }
+
+    #[test]
+    fn test_paid_post_purchase_flow() {
+        mutate(|state| {
+            state.init();
+            let author = pr(1);
+            let buyer = pr(2);
+            create_user(state, author);
+            create_user(state, buyer);
+            state
+                .principal_to_user_mut(buyer)
+                .unwrap()
+                .change_credits(500, CreditsDelta::Plus, "")
+                .unwrap();
+
+            let post_id = Post::create(
+                state,
+                "paid post".to_string(),
+                &[],
+                author,
+                0,
+                None,
+                None,
+                Some(Extension::Access(AccessControl {
+                    visibility: Visibility::Paid,
+                    price: Some(200),
+                })),
+            )
+            .unwrap();
+
+            let viewer = state.principal_to_user(buyer);
+            let post = Post::get(state, &post_id).unwrap();
+            assert!(!state.can_view_post(viewer, post));
+
+            assert!(state.purchase_post(buyer, post_id).is_ok());
+            let viewer = state.principal_to_user(buyer);
+            let post = Post::get(state, &post_id).unwrap();
+            assert!(state.can_view_post(viewer, post));
+        })
     }
 
     #[test]

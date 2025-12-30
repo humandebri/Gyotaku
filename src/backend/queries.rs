@@ -332,16 +332,18 @@ fn personal_filter(
     post: &Post,
 ) -> bool {
     user.map(|user| user.should_see(state, realm, post))
-        .unwrap_or(true)
+        .unwrap_or_else(|| state.can_view_post(None, post))
 }
 
 #[export_name = "canister_query posts"]
 fn posts() {
     let ids: Vec<PostId> = parse(&arg_data_raw());
     read(|state| {
+        let viewer = state.principal_to_user(caller(state));
         reply(
             ids.into_iter()
                 .filter_map(|id| Post::get(state, &id))
+                .filter(|post| state.can_view_post(viewer, post))
                 .map(|post| post.with_meta(state))
                 .collect::<Vec<_>>(),
         );
@@ -352,12 +354,14 @@ fn posts() {
 fn journal() {
     let (domain, handle, page, offset): (String, String, usize, PostId) = parse(&arg_data_raw());
     read(|state| {
+        let viewer = state.principal_to_user(caller(state));
         reply(
             state
                 .user(&handle)
                 .map(|user| {
                     user.posts(Some(&domain), state, offset, false)
                         .filter(|post| !post.is_deleted() && !post.body.starts_with('@'))
+                        .filter(|post| state.can_view_post(viewer, post))
                         .skip(page * CONFIG.feed_page_size)
                         .take(CONFIG.feed_page_size)
                         .map(|post| post.with_meta(state))
@@ -372,6 +376,7 @@ fn journal() {
 fn hot_realm_posts() {
     let (domain, page, offset): (String, usize, PostId) = parse(&arg_data_raw());
     read(|state| {
+        let viewer = state.principal_to_user(caller(state));
         reply(
             state
                 .hot_posts(
@@ -380,6 +385,7 @@ fn hot_realm_posts() {
                     offset,
                     Some(&|post: &Post| post.realm.is_some()),
                 )
+                .filter(|post| state.can_view_post(viewer, post))
                 .skip(page * CONFIG.feed_page_size)
                 .take(CONFIG.feed_page_size)
                 .map(|post| post.with_meta(state))
@@ -398,6 +404,7 @@ fn hot_posts() {
         reply(
             state
                 .hot_posts(domain, realm.as_ref(), offset, None)
+                .filter(|post| state.can_view_post(user, post))
                 .filter(|post| !filtered || personal_filter(state, realm.as_ref(), user, post))
                 .skip(page * CONFIG.feed_page_size)
                 .take(CONFIG.feed_page_size)
@@ -415,6 +422,7 @@ fn realms_posts() {
         reply(
             state
                 .realms_posts(domain, caller(state), offset)
+                .filter(|post| state.can_view_post(user, post))
                 .filter(|post| personal_filter(state, None, user, post))
                 .skip(page * CONFIG.feed_page_size)
                 .take(CONFIG.feed_page_size)
@@ -440,6 +448,7 @@ fn last_posts() {
                     0,
                     /* with_comments = */ false,
                 )
+                .filter(|post| state.can_view_post(user, post))
                 .filter(|post| !filtered || personal_filter(state, realm.as_ref(), user, post))
                 .skip(page * CONFIG.feed_page_size)
                 .take(CONFIG.feed_page_size)
@@ -459,9 +468,11 @@ fn posts_by_tags() {
         PostId,
     ) = parse(&arg_data_raw());
     read(|state| {
+        let viewer = state.principal_to_user(caller(state));
         reply(
             state
                 .posts_by_tags_and_users(&domain, optional(realm), offset, &tags_and_users, false)
+                .filter(|post| state.can_view_post(viewer, post))
                 .skip(page * CONFIG.feed_page_size)
                 .take(CONFIG.feed_page_size)
                 .map(|post| post.with_meta(state))
@@ -490,10 +501,12 @@ fn personal_feed() {
 fn thread() {
     let id: PostId = parse(&arg_data_raw());
     read(|state| {
+        let viewer = state.principal_to_user(caller(state));
         reply(
             state
                 .thread(id)
                 .filter_map(|id| Post::get(state, &id))
+                .filter(|post| state.can_view_post(viewer, post))
                 .map(|post| post.with_meta(state))
                 .collect::<Vec<_>>(),
         )
@@ -577,7 +590,11 @@ struct CaptureDescriptor {
 fn capture_descriptor() {
     let post_id: PostId = parse(&arg_data_raw());
     read(|state| {
+        let viewer = state.principal_to_user(caller(state));
         let descriptor = Post::get(state, &post_id).and_then(|post| {
+            if !state.can_view_post(viewer, post) {
+                return None;
+            }
             post.files.iter().find_map(|(key, &(offset, len))| {
                 key.split_once('@').and_then(|(name, bucket)| {
                     if name == "capture" {

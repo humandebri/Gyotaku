@@ -1,6 +1,6 @@
-# Gyotaku Portal (Next.js + Juno)
+# Gyotaku Portal (Next.js)
 
-ブラウザ向け魚拓ポータルの実験用Next.jsアプリです。Juno Hostingで静的配信する前提で `next export` を採用しています。
+ブラウザ向け魚拓ポータルの実験用Next.jsアプリです。静的配信を前提に `next export` を採用しています。
 
 ## 使い方
 
@@ -10,12 +10,9 @@ npm run dev    # 開発サーバー
 npm run build  # dist/frontend へエクスポート
 ```
 
-## Juno連携
+## 静的ビルド
 
-- `npm run juno:dev` — `juno hosting dev --mode staging` を呼び出し、ローカルからStaging Satelliteへ同期。
-- `npm run juno:deploy` — `juno hosting deploy` を実行。`juno.config.ts` 内の `ids` / `source` を参照します。
-
-`JUNO_TOKEN` を環境変数に設定した上でコマンドを実行してください（例: `.env` やシェルのexport）。
+- `npm run build` で `dist/frontend` を生成します。
 
 ## ルーティング（暫定）
 - `/` : ホーム（フィードのモック）

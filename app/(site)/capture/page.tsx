@@ -83,11 +83,27 @@ async function createCapture(
     const url = (formData.get("url") ?? "").toString().trim();
     const notes = (formData.get("notes") ?? "").toString().trim();
     const realm = (formData.get("realm") ?? "").toString().trim();
+    const visibility = (formData.get("visibility") ?? "public").toString().trim();
+    const priceRaw = (formData.get("price") ?? "").toString().trim();
 
     if (!url) {
         return {
             status: "error",
             message: "URLを入力してください。",
+        };
+    }
+
+    const price = priceRaw ? Number(priceRaw) : undefined;
+    if (priceRaw && (!Number.isFinite(price) || price <= 0 || !Number.isInteger(price))) {
+        return {
+            status: "error",
+            message: "有料価格は1以上の整数で入力してください。",
+        };
+    }
+    if (visibility === "paid" && !price) {
+        return {
+            status: "error",
+            message: "有料にする場合は価格を入力してください。",
         };
     }
 
@@ -129,6 +145,8 @@ async function createCapture(
         html: sanitizedHtml,
         capturedAt,
         contentHash,
+        visibility: visibility || "public",
+        price: visibility === "paid" ? price : undefined,
     });
 
     if (result.success) {

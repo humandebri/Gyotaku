@@ -2,7 +2,7 @@ use self::auction::Auction;
 use self::canisters::{icrc_transfer, upgrade_main_canister};
 use self::invite::Invite;
 use self::invoices::{ICPInvoice, USER_ICP_SUBACCOUNT};
-use self::post::{archive_cold_posts, Extension, Post, PostId};
+use self::post::{archive_cold_posts, AccessControl, Extension, Post, PostId, Visibility};
 use self::post_iterators::{IteratorMerger, MergeStrategy};
 use self::proposals::{Payload, ReleaseInfo, Status};
 use self::token::{account, TransferArgs};
@@ -834,6 +834,86 @@ impl State {
                 ),
                 post_id,
             );
+        Ok(())
+    }
+
+    pub fn can_view_post(&self, viewer: Option<&User>, post: &Post) -> bool {
+        match post.access.visibility {
+            Visibility::Draft => viewer.map(|user| user.id == post.user).unwrap_or(false),
+            Visibility::Public => true,
+            Visibility::FollowersOnly => viewer
+                .map(|user| user.followees.contains(&post.user))
+                .unwrap_or(false),
+            Visibility::Paid => viewer
+                .map(|user| user.id == post.user || user.has_purchased(post.id))
+                .unwrap_or(false),
+        }
+    }
+
+    pub fn purchase_post(&mut self, principal: Principal, post_id: PostId) -> Result<(), String> {
+        let buyer = self.principal_to_user(principal).ok_or("user not found")?;
+        let buyer_id = buyer.id;
+        let buyer_name = buyer.name.clone();
+        let post = Post::get(self, &post_id).ok_or("post not found")?.clone();
+        let AccessControl { visibility, price } = post.access.clone();
+        if !matches!(visibility, Visibility::Paid) {
+            return Err("post is not paid".into());
+        }
+        if post.user == buyer_id {
+            return Err("author cannot purchase own post".into());
+        }
+        if buyer.has_purchased(post_id) {
+            return Ok(());
+        }
+        let price = price.ok_or("paid post missing price")?;
+        let fee = price
+            .checked_mul(CONFIG.purchase_fee_bps)
+            .ok_or("fee overflow")?
+            .checked_add(9_999)
+            .ok_or("fee overflow")?
+            / 10_000;
+        let author_id = post.user;
+        let author = self.users.get(&author_id).ok_or("author not found")?;
+        let system_user_id = MAX_USER_ID;
+        let author_name = author.name.clone();
+        let net_price = price.saturating_sub(fee);
+
+        {
+            let buyer = self.users.get_mut(&buyer_id).expect("user not found");
+            buyer.change_credits(
+                price,
+                CreditsDelta::Minus,
+                format!("purchase post {}", post_id),
+            )?;
+            buyer.purchased_posts.insert(post_id);
+        }
+        if net_price > 0 {
+            let author = self.users.get_mut(&author_id).expect("author not found");
+            author.change_credits(
+                net_price,
+                CreditsDelta::Plus,
+                format!("sold post {}", post_id),
+            )?;
+            author.notify_about_post(
+                format!("@{} purchased your post", buyer_name),
+                post_id,
+            );
+        }
+        if fee > 0 {
+            let system_user = self
+                .users
+                .get_mut(&system_user_id)
+                .ok_or("system user not found")?;
+            system_user.change_credits(
+                fee,
+                CreditsDelta::Plus,
+                format!("platform fee for post {}", post_id),
+            )?;
+        }
+        self.logger.info(format!(
+            "post {} purchased by @{} (author @{}, price {}, fee {})",
+            post_id, buyer_name, author_name, price, fee
+        ));
         Ok(())
     }
 
